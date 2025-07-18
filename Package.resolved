@@ -1,0 +1,15 @@
+{
+  "originHash" : "b402480a6550b39666cec32980d05684d00036ea08ea32a017af9784600af56a",
+  "pins" : [
+    {
+      "identity" : "trustkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/datatheorem/TrustKit",
+      "state" : {
+        "revision" : "a94f27be00a9811618ff92f0d3fc40dac8211ba7",
+        "version" : "3.0.7"
+      }
+    }
+  ],
+  "version" : 3
+}
