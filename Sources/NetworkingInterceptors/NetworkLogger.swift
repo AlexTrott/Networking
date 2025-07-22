@@ -1,10 +1,7 @@
 import Foundation
 import os.log
+import NetworkingInterface
 
-public protocol NetworkLogger: Sendable {
-    func logRequest(_ request: NetworkRequest)
-    func logResponse(_ response: NetworkResponse, for request: NetworkRequest)
-}
 
 public final class DefaultNetworkLogger: NetworkLogger {
     private let logger = Logger(subsystem: "com.networking", category: "NetworkLogger")

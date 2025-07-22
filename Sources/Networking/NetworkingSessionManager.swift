@@ -1,19 +1,28 @@
 import Foundation
+import NetworkingInterface
 
-public final class URLSessionManager: NSObject, Sendable {
-    private let certificatePinning: CertificatePinning
+public final class NetworkingSessionManager: NSObject, NetworkingSessionManagerProtocol, Sendable {
+    private let certificatePinning: CertificatePinningProtocol
     private let certificatePinningEnabled: Bool
     private let configuration: URLSessionConfiguration
     private let session: URLSession? = nil
 
-    public init(certificatePinning: CertificatePinning, certificatePinningEnabled: Bool = true) {
+    public init(
+        certificatePinning: CertificatePinningProtocol,
+        certificatePinningEnabled: Bool = true,
+        configuration: URLSessionConfiguration? = nil
+    ) {
         self.certificatePinning = certificatePinning
         self.certificatePinningEnabled = certificatePinningEnabled
 
-        // pull out
-        self.configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 60.0
-        configuration.timeoutIntervalForResource = 120.0
+        // Use provided configuration or create default
+        if let configuration = configuration {
+            self.configuration = configuration
+        } else {
+            self.configuration = URLSessionConfiguration.default
+            self.configuration.timeoutIntervalForRequest = 60.0
+            self.configuration.timeoutIntervalForResource = 120.0
+        }
     }
 
     func createSession() -> URLSession {
@@ -64,7 +73,7 @@ public final class URLSessionManager: NSObject, Sendable {
     }
 }
 
-extension URLSessionManager: URLSessionDelegate {
+extension NetworkingSessionManager: URLSessionDelegate {
     public func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,

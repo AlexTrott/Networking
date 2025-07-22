@@ -1,12 +1,7 @@
 import Foundation
+import NetworkingInterface
 
-public protocol RequestInterceptor: Sendable {
-    func intercept(request: NetworkRequest) async throws -> NetworkRequest
-}
 
-public protocol ResponseInterceptor: Sendable {
-    func intercept(response: NetworkResponse, for request: NetworkRequest) async throws -> NetworkResponse
-}
 
 public final class LoggingInterceptor: RequestInterceptor, ResponseInterceptor {
     private let logger: NetworkLogger

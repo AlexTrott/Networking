@@ -1,13 +1,16 @@
 import Foundation
 import TrustKit
+import NetworkingInterface
 
-public final class CertificatePinning: @unchecked Sendable {
-    private let environment: Environment
+public final class CertificatePinning: CertificatePinningProtocol, @unchecked Sendable {
+    private let environment: NetworkingEnvironment
+    private let trustKit: TrustKitProtocol
     private var isInitialized = false
     private let initializationLock = NSLock()
     
-    public init(environment: Environment) {
+    public init(environment: NetworkingEnvironment, trustKit: TrustKitProtocol = RealTrustKit()) {
         self.environment = environment
+        self.trustKit = trustKit
     }
     
     public func initialize() {
@@ -17,7 +20,7 @@ public final class CertificatePinning: @unchecked Sendable {
         guard !isInitialized else { return }
         
         let trustKitConfig = createTrustKitConfig()
-        TrustKit.initSharedInstance(withConfiguration: trustKitConfig)
+        trustKit.initSharedInstance(withConfiguration: trustKitConfig)
         isInitialized = true
     }
     
@@ -44,11 +47,10 @@ public final class CertificatePinning: @unchecked Sendable {
             initialize()
         }
         
-        let trustKit = TrustKit.sharedInstance()
         let validator = trustKit.pinningValidator
         let result = validator.evaluateTrust(trust, forHostname: hostname)
         
         // TSKTrustDecision.shouldAllowConnection means trust is valid
-        return result == TSKTrustDecision.shouldAllowConnection
+        return result == .shouldAllowConnection
     }
 }

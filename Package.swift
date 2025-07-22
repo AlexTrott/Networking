@@ -11,7 +11,15 @@ let package = Package(
     ],
     products: [
         .library(
+            name: "NetworkingInterface",
+            targets: ["NetworkingInterface"]
+        ),
+        .library(
             name: "Networking",
+            targets: ["Networking"]
+        ),
+        .library(
+            name: "NetworkingInterceptors",
             targets: ["Networking"]
         ),
     ],
@@ -20,12 +28,29 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "NetworkingInterface",
+            dependencies: []
+        ),
+        .target(
             name: "Networking",
-            dependencies: ["TrustKit"]
+            dependencies: [
+                "TrustKit",
+                "NetworkingInterface"
+            ]
+        ),
+        .target(
+            name: "NetworkingInterceptors",
+            dependencies: [
+                "NetworkingInterface"
+            ]
         ),
         .testTarget(
             name: "NetworkingTests",
-            dependencies: ["Networking"]
+            dependencies: [
+                "Networking",
+                "NetworkingInterceptors",
+                "NetworkingInterface"
+            ]
         ),
     ]
 )
