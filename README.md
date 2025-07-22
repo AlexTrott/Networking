@@ -4,16 +4,18 @@ A comprehensive, secure, and modern iOS networking library built with Swift 6.0 
 
 ## Features
 
-- ✅ **Swift 6.0** with full concurrency support
+- ✅ **Swift 6.0** with full concurrency support (`Sendable`, `async/await`, thread-safe)
 - ✅ **iOS 15+** deployment target
-- ✅ **Certificate Pinning** with TrustKit integration
+- ✅ **Certificate Pinning** with TrustKit integration (thread-safe initialization)
 - ✅ **Multi-Environment Support** (Development, Staging, Production)
-- ✅ **Async/Await** throughout
-- ✅ **Protocol-Based Design** for testability
+- ✅ **Async/Await** throughout with proper concurrency handling
+- ✅ **Protocol-Based Design** for testability and dependency injection
 - ✅ **Request/Response Interceptors** for middleware functionality
-- ✅ **Comprehensive Error Handling**
-- ✅ **Swift Testing** test suite
-- ✅ **Generic & Modular** architecture
+- ✅ **Comprehensive Error Handling** with structured error types
+- ✅ **Swift Testing** test suite (36+ tests, 100% concurrency compliant)
+- ✅ **Generic & Modular** architecture with clean separation of concerns
+- ✅ **Thread-Safe URLSession Management** with proper lifecycle handling
+- ✅ **Comprehensive Test Coverage** with URLProtocolMock for network stubbing
 
 ## Installation
 
@@ -79,55 +81,53 @@ let client = NetworkingClient(
 
 ### Environment Setup
 
-Update the `Environment.swift` file with your actual endpoints and certificate pins:
+The library uses a modern protocol-based environment configuration:
 
 ```swift
-public enum Environment: String, CaseIterable, Sendable {
-    case development
-    case staging
-    case production
+// NetworkingEnvironment protocol for flexible configuration
+public protocol NetworkingEnvironment: Sendable {
+    var baseURL: URL { get }
+    var certificatePins: [String: [String]] { get }
+    var allowInsecureConnections: Bool { get }
+}
+
+// Example implementation
+public struct ProductionEnvironment: NetworkingEnvironment {
+    public let baseURL = URL(string: "https://api.yourapp.com")!
     
-    public var baseURL: URL {
-        switch self {
-        case .development:
-            return URL(string: "https://dev-api.yourapp.com")!
-        case .staging:
-            return URL(string: "https://staging-api.yourapp.com")!
-        case .production:
-            return URL(string: "https://api.yourapp.com")!
-        }
-    }
+    public let certificatePins = [
+        "api.yourapp.com": [
+            "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+        ]
+    ]
     
-    public var certificatePins: [String: [String]] {
-        switch self {
-        case .development:
-            return [
-                "dev-api.yourapp.com": [
-                    "YOUR_DEV_CERTIFICATE_PIN_1",
-                    "YOUR_DEV_CERTIFICATE_PIN_2"
-                ]
-            ]
-        // ... other environments
-        }
-    }
+    public let allowInsecureConnections = false
 }
 ```
 
 ### Certificate Pinning
 
-Certificate pinning is enabled by default and uses TrustKit for secure validation. To get your certificate pins:
+Certificate pinning is enabled by default and uses TrustKit for secure validation with **thread-safe eager initialization**:
 
 1. **Extract certificate pins from your server:**
    ```bash
    openssl s_client -connect api.yourapp.com:443 -servername api.yourapp.com < /dev/null | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64
    ```
 
-2. **For debugging, disable certificate pinning:**
+2. **Thread-safe certificate pinning initialization:**
    ```swift
-   let debugClient = NetworkingClient(
-       environment: .development,
-       certificatePinningEnabled: false
+   // TrustKit is initialized eagerly and thread-safely in the constructor
+   let certificatePinning = CertificatePinning(
+       environment: environment,
+       trustKit: RealTrustKit() // or MockTrustKit() for testing
    )
+   ```
+
+3. **For debugging, disable certificate pinning:**
+   ```swift
+   let debugEnvironment = TestEnvironment(allowInsecureConnections: true)
+   let debugClient = NetworkingClient(environment: debugEnvironment)
    ```
 
 ## API Reference
@@ -137,12 +137,22 @@ Certificate pinning is enabled by default and uses TrustKit for secure validatio
 #### Initialization
 
 ```swift
+// Primary initializer with NetworkingEnvironment protocol
 public init(
-    environment: Environment,
-    requestInterceptors: [RequestInterceptor] = [],
-    responseInterceptors: [ResponseInterceptor] = [],
+    environment: any NetworkingEnvironment,
+    requestInterceptors: [any RequestInterceptor] = [],
+    responseInterceptors: [any ResponseInterceptor] = [],
     decoder: JSONDecoder = JSONDecoder(),
-    certificatePinningEnabled: Bool = true
+    trustKit: any TrustKitProtocol = RealTrustKit()
+)
+
+// Advanced initializer with custom session manager
+public init(
+    environment: any NetworkingEnvironment,
+    requestInterceptors: [any RequestInterceptor] = [],
+    responseInterceptors: [any ResponseInterceptor] = [],
+    decoder: JSONDecoder = JSONDecoder(),
+    sessionManager: any NetworkingSessionManagerProtocol
 )
 ```
 
@@ -367,17 +377,42 @@ class MockNetworkingClient: NetworkingClientProtocol {
 
 ## Testing
 
-The library includes comprehensive tests using Swift Testing:
+The library includes **36+ comprehensive tests** using Swift Testing with **100% Swift Concurrency compliance**:
 
 ```bash
 swift test
 ```
+
+### Test Coverage
+
+- ✅ **NetworkingClient**: All HTTP methods, error handling, interceptors
+- ✅ **Certificate Pinning**: Thread-safe initialization, TrustKit integration
+- ✅ **Session Management**: URLSession lifecycle, proper cleanup
+- ✅ **Request/Response Models**: Serialization, validation
+- ✅ **Interceptors**: Authentication, User-Agent, Logging
+- ✅ **Error Handling**: All error types, proper mapping
+- ✅ **Mock Framework**: URLProtocolMock for network stubbing
+
+### Test Features
+
+- **URLProtocolMock**: Comprehensive network request stubbing
+- **Thread-safe mocks**: All test mocks are `Sendable` compliant
+- **Concurrency testing**: Async/await throughout test suite
+- **Dependency injection**: Protocol-based design enables easy testing
 
 ### Running Tests in Xcode
 
 1. Open the package in Xcode
 2. Press `⌘+U` to run tests
 3. View test results in the navigator
+
+### Swift Concurrency Compliance
+
+All tests and production code are fully compliant with Swift 6 strict concurrency:
+- No `@unchecked Sendable` in production code
+- Thread-safe initialization patterns
+- Proper actor isolation
+- Sendable protocol conformance throughout
 
 ## Requirements
 
@@ -402,24 +437,58 @@ swift test
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## Architecture
+
+### Key Design Principles
+
+- **Protocol-Based**: All components implement protocols for testability and flexibility
+- **Sendable Compliant**: Full Swift 6 concurrency support with thread-safe design
+- **Dependency Injection**: Easy to mock and test all components
+- **Separation of Concerns**: Clear boundaries between networking, security, and business logic
+
+### Component Structure
+
+```
+├── NetworkingInterface/     # Public protocols and models
+│   ├── Models/             # NetworkRequest, NetworkResponse, HTTPMethod
+│   └── Protocols/          # NetworkingClientProtocol, interceptors
+├── Networking/             # Core implementation
+│   ├── NetworkingClient.swift          # Main client implementation
+│   ├── NetworkingSessionManager.swift  # URLSession management
+│   ├── CertificatePinning.swift       # TrustKit integration
+│   └── Interceptors/                   # Built-in interceptors
+└── Tests/                  # Comprehensive test suite
+    ├── Mocks/             # URLProtocolMock, test doubles
+    └── TestHelpers/       # Shared testing utilities
+```
+
 ## Security
 
 ### Certificate Pinning
 
-This library implements certificate pinning using TrustKit to prevent man-in-the-middle attacks. Ensure you:
+This library implements certificate pinning using TrustKit with **thread-safe eager initialization** to prevent man-in-the-middle attacks:
 
-1. Use real certificate pins in production
-2. Have a backup pin ready for certificate rotation
-3. Test certificate pinning thoroughly in your staging environment
-4. Monitor certificate expiration dates
+1. **Thread-Safe Initialization**: TrustKit is initialized once during CertificatePinning construction
+2. **Real certificate pins in production**: Never use placeholder pins
+3. **Backup pin ready**: Always have a secondary pin for certificate rotation
+4. **Staging environment testing**: Thoroughly test certificate pinning before production
+5. **Certificate monitoring**: Track certificate expiration dates
+
+### Security Features
+
+- **Eager TrustKit Initialization**: Prevents race conditions and ensures thread safety
+- **Proper URLSession Lifecycle**: Sessions are properly cleaned up to prevent leaks
+- **Secure by Default**: Certificate pinning enabled unless explicitly disabled
+- **Protocol-Based Security**: Easy to audit and test security components
 
 ### Best Practices
 
 - Always use HTTPS in production
-- Implement proper authentication
-- Validate all user inputs
-- Log security-relevant events
-- Keep dependencies updated
+- Implement proper authentication with interceptors
+- Validate all user inputs before network requests
+- Log security-relevant events with LoggingInterceptor
+- Keep TrustKit dependency updated
+- Use dependency injection for security components to enable testing
 
 ## Support
 
