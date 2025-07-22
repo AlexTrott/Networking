@@ -1,11 +1,33 @@
 import Foundation
 import NetworkingInterface
 
-public final class NetworkingSessionManager: NSObject, NetworkingSessionManagerProtocol, Sendable {
+public final class NetworkingSessionManager: NSObject, NetworkingSessionManagerProtocol {
     private let certificatePinning: CertificatePinningProtocol
     private let certificatePinningEnabled: Bool
     private let configuration: URLSessionConfiguration
-    private let session: URLSession? = nil
+    private let sessionHolder: SessionHolder
+    private let delegateQueue: OperationQueue
+    
+    // Use a reference type to hold the session to maintain Sendable conformance
+    private final class SessionHolder: @unchecked Sendable {
+        private var _session: URLSession?
+        private let lock = NSLock()
+        
+        func setSession(_ session: URLSession) {
+            lock.lock()
+            defer { lock.unlock() }
+            _session = session
+        }
+        
+        var session: URLSession {
+            lock.lock()
+            defer { lock.unlock() }
+            guard let session = _session else {
+                fatalError("URLSession accessed before initialization")
+            }
+            return session
+        }
+    }
 
     public init(
         certificatePinning: CertificatePinningProtocol,
@@ -23,22 +45,35 @@ public final class NetworkingSessionManager: NSObject, NetworkingSessionManagerP
             self.configuration.timeoutIntervalForRequest = 60.0
             self.configuration.timeoutIntervalForResource = 120.0
         }
-    }
-
-    func createSession() -> URLSession {
-        URLSession(
-            configuration: configuration,
+        
+        // Create a dedicated queue for delegate callbacks
+        self.delegateQueue = OperationQueue()
+        self.delegateQueue.name = "com.networking.sessionManager.delegateQueue"
+        self.delegateQueue.maxConcurrentOperationCount = 1
+        
+        self.sessionHolder = SessionHolder()
+        
+        super.init()
+        
+        // Now create the actual session with self as delegate
+        let session = URLSession(
+            configuration: self.configuration,
             delegate: self,
-            delegateQueue: nil
+            delegateQueue: self.delegateQueue
         )
+        self.sessionHolder.setSession(session)
+    }
+    
+    deinit {
+        // Properly invalidate the session to prevent memory leaks
+        sessionHolder.session.invalidateAndCancel()
     }
 
     public func perform(_ request: NetworkRequest) async throws -> NetworkResponse {
-        let session = createSession()
         let urlRequest = request.toURLRequest()
         
         do {
-            let (data, response): (Data, URLResponse) = try await session.data(for: urlRequest)
+            let (data, response): (Data, URLResponse) = try await sessionHolder.session.data(for: urlRequest)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw NetworkError.invalidRequest
@@ -77,7 +112,7 @@ extension NetworkingSessionManager: URLSessionDelegate {
     public func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
-        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+        completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
         guard certificatePinningEnabled else {
             completionHandler(.performDefaultHandling, nil)
@@ -98,3 +133,6 @@ extension NetworkingSessionManager: URLSessionDelegate {
         }
     }
 }
+
+// Make NetworkingSessionManager explicitly Sendable
+extension NetworkingSessionManager: @unchecked Sendable {}

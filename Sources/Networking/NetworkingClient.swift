@@ -1,18 +1,18 @@
 import Foundation
 import NetworkingInterface
 
-public final class NetworkingClient: NetworkingClientProtocol {
+public final class NetworkingClient: NetworkingClientProtocol, Sendable {
     private let environment: NetworkingEnvironment
     private let sessionManager: NetworkingSessionManagerProtocol
     private let requestInterceptors: [RequestInterceptor]
     private let responseInterceptors: [ResponseInterceptor]
-    private let decoder: JSONDecoder
+    private let decoderFactory: @Sendable () -> JSONDecoder
     
     public init(
         environment: NetworkingEnvironment,
         requestInterceptors: [RequestInterceptor] = [],
         responseInterceptors: [ResponseInterceptor] = [],
-        decoder: JSONDecoder = JSONDecoder(),
+        decoderFactory: @escaping @Sendable () -> JSONDecoder = { JSONDecoder() },
         sessionManager: NetworkingSessionManagerProtocol? = nil,
         certificatePinningEnabled: Bool = true,
         trustKit: TrustKitProtocol? = nil
@@ -20,7 +20,7 @@ public final class NetworkingClient: NetworkingClientProtocol {
         self.environment = environment
         self.requestInterceptors = requestInterceptors
         self.responseInterceptors = responseInterceptors
-        self.decoder = decoder
+        self.decoderFactory = decoderFactory
         
         if let sessionManager = sessionManager {
             self.sessionManager = sessionManager
@@ -37,6 +37,27 @@ public final class NetworkingClient: NetworkingClientProtocol {
                 certificatePinningEnabled: certificatePinningEnabled
             )
         }
+    }
+    
+    // Convenience initializer for backward compatibility
+    public convenience init(
+        environment: NetworkingEnvironment,
+        requestInterceptors: [RequestInterceptor] = [],
+        responseInterceptors: [ResponseInterceptor] = [],
+        decoder: JSONDecoder,
+        sessionManager: NetworkingSessionManagerProtocol? = nil,
+        certificatePinningEnabled: Bool = true,
+        trustKit: TrustKitProtocol? = nil
+    ) {
+        self.init(
+            environment: environment,
+            requestInterceptors: requestInterceptors,
+            responseInterceptors: responseInterceptors,
+            decoderFactory: { decoder },
+            sessionManager: sessionManager,
+            certificatePinningEnabled: certificatePinningEnabled,
+            trustKit: trustKit
+        )
     }
 
     public func get<T: Decodable>(_ type: T.Type, path: String, headers: [String: String] = [:]) async throws -> T {
@@ -70,7 +91,7 @@ private extension NetworkingClient {
         let response = try await perform(request)
 
         do {
-            return try response.decode(type, using: decoder)
+            return try response.decode(type, using: decoderFactory())
         } catch {
             throw NetworkError.decodingFailed(error)
         }
@@ -91,7 +112,7 @@ private extension NetworkingClient {
         let response = try await perform(request)
 
         do {
-            return try response.decode(type, using: decoder)
+            return try response.decode(type, using: decoderFactory())
         } catch {
             throw NetworkError.decodingFailed(error)
         }
@@ -112,7 +133,7 @@ private extension NetworkingClient {
         let response = try await perform(request)
 
         do {
-            return try response.decode(type, using: decoder)
+            return try response.decode(type, using: decoderFactory())
         } catch {
             throw NetworkError.decodingFailed(error)
         }

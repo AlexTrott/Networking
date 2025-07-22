@@ -13,8 +13,8 @@ struct CertificatePinningTests {
             certificatePins: ["api.example.com": ["pin1", "pin2"]]
         )
         
-        let _ = CertificatePinning(environment: environment)
-        
+        let _ = CertificatePinning(environment: environment, trustKit: MockTrustKit())
+
         // Certificate pinning instance should be created successfully
     }
     
@@ -26,11 +26,19 @@ struct CertificatePinningTests {
         
         let certificatePinning = CertificatePinning(environment: environment, trustKit: MockTrustKit())
 
-        // Simulate concurrent initialization attempts
+        // Simulate concurrent trust validation calls (TrustKit is now initialized eagerly)
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<10 {
                 group.addTask {
-                    certificatePinning.initialize()
+                    // Create a dummy SecTrust for testing thread safety
+                    var trust: SecTrust?
+                    let policy = SecPolicyCreateBasicX509()
+                    let certificates: [SecCertificate] = []
+                    let status = SecTrustCreateWithCertificates(certificates as CFArray, policy, &trust)
+                    
+                    if status == errSecSuccess, let validTrust = trust {
+                        _ = certificatePinning.canTrustServer(trust: validTrust, forHostname: "test.example.com")
+                    }
                 }
             }
         }
@@ -50,11 +58,9 @@ struct CertificatePinningTests {
             allowInsecureConnections: false
         )
         
-        let certificatePinning = CertificatePinning(environment: environment, trustKit: MockTrustKit())
+        let _ = CertificatePinning(environment: environment, trustKit: MockTrustKit())
 
-        // We can't directly test the private createTrustKitConfig method,
-        // but we can test the behavior by initializing
-        certificatePinning.initialize()
+        // TrustKit is now initialized eagerly in the constructor
         
         // Certificate pinning instance should be created successfully
     }
@@ -66,8 +72,8 @@ struct CertificatePinningTests {
             allowInsecureConnections: true
         )
         
-        let certificatePinning = CertificatePinning(environment: environment, trustKit: MockTrustKit())
-        certificatePinning.initialize()
+        let _ = CertificatePinning(environment: environment, trustKit: MockTrustKit())
+        // TrustKit is now initialized eagerly in the constructor
         
         // Certificate pinning instance should be created successfully
     }
@@ -79,8 +85,8 @@ struct CertificatePinningTests {
             allowInsecureConnections: false
         )
         
-        let certificatePinning = CertificatePinning(environment: environment, trustKit: MockTrustKit())
-        certificatePinning.initialize()
+        let _ = CertificatePinning(environment: environment, trustKit: MockTrustKit())
+        // TrustKit is now initialized eagerly in the constructor
         
         // Certificate pinning instance should be created successfully
     }
@@ -120,10 +126,18 @@ struct CertificatePinningTests {
         
         let certificatePinning = CertificatePinning(environment: environment, trustKit: MockTrustKit())
 
-        // Multiple calls should be safe
-        certificatePinning.initialize()
-        certificatePinning.initialize()
-        certificatePinning.initialize()
+        // TrustKit initialization is now handled once in constructor
+        // Test that the certificate pinning can be used multiple times safely
+        var trust: SecTrust?
+        let policy = SecPolicyCreateBasicX509()
+        let certificates: [SecCertificate] = []
+        let status = SecTrustCreateWithCertificates(certificates as CFArray, policy, &trust)
+        
+        if status == errSecSuccess, let validTrust = trust {
+            _ = certificatePinning.canTrustServer(trust: validTrust, forHostname: "test1.example.com")
+            _ = certificatePinning.canTrustServer(trust: validTrust, forHostname: "test2.example.com")
+            _ = certificatePinning.canTrustServer(trust: validTrust, forHostname: "test3.example.com")
+        }
         
         // Certificate pinning instance should be created successfully
     }
@@ -139,8 +153,8 @@ struct CertificatePinningConfigurationTests {
             certificatePins: ["api.example.com": pins]
         )
         
-        let certificatePinning = CertificatePinning(environment: environment, trustKit: MockTrustKit())
-        certificatePinning.initialize()
+        let _ = CertificatePinning(environment: environment, trustKit: MockTrustKit())
+        // TrustKit is now initialized eagerly in the constructor
         
         // Certificate pinning instance should be created successfully
     }
@@ -156,8 +170,8 @@ struct CertificatePinningConfigurationTests {
             certificatePins: certificatePins
         )
         
-        let certificatePinning = CertificatePinning(environment: environment, trustKit: MockTrustKit())
-        certificatePinning.initialize()
+        let _ = CertificatePinning(environment: environment, trustKit: MockTrustKit())
+        // TrustKit is now initialized eagerly in the constructor
         
         // Certificate pinning instance should be created successfully
     }
@@ -175,8 +189,8 @@ struct CertificatePinningConfigurationTests {
             certificatePins: complexPins
         )
         
-        let certificatePinning = CertificatePinning(environment: environment, trustKit: MockTrustKit())
-        certificatePinning.initialize()
+        let _ = CertificatePinning(environment: environment, trustKit: MockTrustKit())
+        // TrustKit is now initialized eagerly in the constructor
         
         // Certificate pinning instance should be created successfully
     }
@@ -192,8 +206,8 @@ struct CertificatePinningConfigurationTests {
             certificatePins: pins
         )
         
-        let certificatePinning = CertificatePinning(environment: environment, trustKit: MockTrustKit())
-        certificatePinning.initialize()
+        let _ = CertificatePinning(environment: environment, trustKit: MockTrustKit())
+        // TrustKit is now initialized eagerly in the constructor
         
         // Certificate pinning instance should be created successfully
     }
@@ -275,8 +289,8 @@ struct CertificatePinningMockTests {
         )
         
         let mockTrustKit = MockTrustKit()
-        let certificatePinning = CertificatePinning(environment: environment, trustKit: mockTrustKit)
-        certificatePinning.initialize()
+        let _ = CertificatePinning(environment: environment, trustKit: mockTrustKit)
+        // TrustKit is now initialized eagerly in the constructor
         
         #expect(mockTrustKit.initializationCallCount == 1)
         

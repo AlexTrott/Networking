@@ -10,22 +10,37 @@ import TrustKit
 import NetworkingInterface
 
 /// Real implementation of TrustKitProtocol that wraps the actual TrustKit library
-public final class RealTrustKit: TrustKitProtocol, @unchecked Sendable {
-    private var _isInitialized = false
-    private let initLock = NSLock()
+public final class RealTrustKit: TrustKitProtocol, Sendable {
+    private let _isInitialized = Box(false)
+    
+    // Simple thread-safe box for storing a boolean
+    private final class Box<T>: @unchecked Sendable {
+        private var value: T
+        private let lock = NSLock()
+        
+        init(_ value: T) {
+            self.value = value
+        }
+        
+        func get() -> T {
+            lock.withLock { value }
+        }
+        
+        func set(_ newValue: T) {
+            lock.withLock { value = newValue }
+        }
+    }
     
     public init() {}
     
     public var isInitialized: Bool {
-        initLock.withLock { _isInitialized }
+        _isInitialized.get()
     }
     
     public func initSharedInstance(withConfiguration config: [String: Any]) {
-        initLock.withLock {
-            guard !_isInitialized else { return }
-            TrustKit.initSharedInstance(withConfiguration: config)
-            _isInitialized = true
-        }
+        guard !isInitialized else { return }
+        TrustKit.initSharedInstance(withConfiguration: config)
+        _isInitialized.set(true)
     }
     
     public var pinningValidator: PinningValidatorProtocol {
@@ -37,7 +52,7 @@ public final class RealTrustKit: TrustKitProtocol, @unchecked Sendable {
 }
 
 /// Real implementation of PinningValidatorProtocol that wraps TrustKit's validator
-private final class RealPinningValidator: PinningValidatorProtocol, @unchecked Sendable {
+private final class RealPinningValidator: PinningValidatorProtocol, Sendable {
     
     func evaluateTrust(_ trust: SecTrust, forHostname hostname: String) -> NetworkingInterface.TSKTrustDecision {
         let trustKit = TrustKit.sharedInstance()

@@ -3,7 +3,7 @@ import os.log
 import NetworkingInterface
 
 
-public final class DefaultNetworkLogger: NetworkLogger {
+public final class DefaultNetworkLogger: NetworkLogger, Sendable {
     private let logger = Logger(subsystem: "com.networking", category: "NetworkLogger")
     
     public init() {}
@@ -34,7 +34,7 @@ public final class DefaultNetworkLogger: NetworkLogger {
     }
 }
 
-public final class NoOpNetworkLogger: NetworkLogger {
+public final class NoOpNetworkLogger: NetworkLogger, Sendable {
     public init() {}
     
     public func logRequest(_ request: NetworkRequest) {}

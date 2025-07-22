@@ -2,29 +2,22 @@ import Foundation
 import TrustKit
 import NetworkingInterface
 
-public final class CertificatePinning: CertificatePinningProtocol, @unchecked Sendable {
+public final class CertificatePinning: CertificatePinningProtocol, Sendable {
     private let environment: NetworkingEnvironment
     private let trustKit: TrustKitProtocol
-    private var isInitialized = false
-    private let initializationLock = NSLock()
     
+    // Initialize TrustKit eagerly to avoid the need for lazy initialization
     public init(environment: NetworkingEnvironment, trustKit: TrustKitProtocol = RealTrustKit()) {
         self.environment = environment
         self.trustKit = trustKit
-    }
-    
-    public func initialize() {
-        initializationLock.lock()
-        defer { initializationLock.unlock() }
         
-        guard !isInitialized else { return }
-        
-        let trustKitConfig = createTrustKitConfig()
+        // Eagerly initialize TrustKit to avoid thread safety concerns
+        let trustKitConfig = Self.createTrustKitConfig(for: environment)
         trustKit.initSharedInstance(withConfiguration: trustKitConfig)
-        isInitialized = true
     }
     
-    private func createTrustKitConfig() -> [String: Any] {
+    // Make this a static method to avoid self access during init
+    private static func createTrustKitConfig(for environment: NetworkingEnvironment) -> [String: Any] {
         var pinnedDomains: [String: Any] = [:]
         
         for (domain, pins) in environment.certificatePins {
@@ -43,10 +36,7 @@ public final class CertificatePinning: CertificatePinningProtocol, @unchecked Se
     }
     
     public func canTrustServer(trust: SecTrust, forHostname hostname: String) -> Bool {
-        if !isInitialized {
-            initialize()
-        }
-        
+        // TrustKit is already initialized in init, so we can directly use it
         let validator = trustKit.pinningValidator
         let result = validator.evaluateTrust(trust, forHostname: hostname)
         

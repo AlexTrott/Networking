@@ -46,7 +46,7 @@ struct NetworkingClientTests {
         do {
             let result: TestModel = try await client.get(TestModel.self, path: "users/123")
             #expect(result == TestFixtures.testModel)
-            #expect(mockSessionManager.performCallCount == 1)
+            #expect(mockSessionManager.callCount == 1)
             #expect(mockSessionManager.didReceiveRequest(withPath: "/users/123"))
             #expect(mockSessionManager.didReceiveRequest(withMethod: .GET))
         } catch {
@@ -73,7 +73,7 @@ struct NetworkingClientTests {
             
             // Check that the interceptor received a request with Content-Type header
             #expect(mockRequestInterceptor.lastInterceptedRequest?.headers["Content-Type"] == "application/json")
-            #expect(mockSessionManager.performCallCount == 1)
+            #expect(mockSessionManager.callCount == 1)
             #expect(mockSessionManager.didReceiveRequest(withMethod: .POST))
         } catch {
             Issue.record("POST request failed: \(error)")
@@ -104,7 +104,7 @@ struct NetworkingClientTests {
             )
             
             #expect(mockRequestInterceptor.lastInterceptedRequest?.headers["Content-Type"] == "application/xml")
-            #expect(mockSessionManager.performCallCount == 1)
+            #expect(mockSessionManager.callCount == 1)
         } catch {
             Issue.record("POST request with custom Content-Type failed: \(error)")
         }

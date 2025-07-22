@@ -3,7 +3,7 @@ import NetworkingInterface
 
 
 
-public final class LoggingInterceptor: RequestInterceptor, ResponseInterceptor {
+public final class LoggingInterceptor: RequestInterceptor, ResponseInterceptor, Sendable {
     private let logger: NetworkLogger
     
     public init(logger: NetworkLogger = DefaultNetworkLogger()) {
@@ -21,7 +21,7 @@ public final class LoggingInterceptor: RequestInterceptor, ResponseInterceptor {
     }
 }
 
-public final class AuthenticationInterceptor: RequestInterceptor {
+public final class AuthenticationInterceptor: RequestInterceptor, Sendable {
     private let tokenProvider: @Sendable () async -> String?
     
     public init(tokenProvider: @escaping @Sendable () async -> String?) {
@@ -46,7 +46,7 @@ public final class AuthenticationInterceptor: RequestInterceptor {
     }
 }
 
-public final class UserAgentInterceptor: RequestInterceptor {
+public final class UserAgentInterceptor: RequestInterceptor, Sendable {
     private let userAgent: String
     
     public init(userAgent: String) {
